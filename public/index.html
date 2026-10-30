@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#1f6f5c">
+  <title>Health Coach</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div class="app">
+    <header class="top">
+      <span class="mark" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg></span>
+      <h1><span id="appName">Health Coach</span><small id="subtitle">Your AI coach · test version</small></h1>
+      <button class="icon-btn" id="menuBtn" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
+      </button>
+      <div class="menu" id="menu" role="menu" hidden>
+        <a href="/api/me/export" role="menuitem" download>Download my data</a>
+        <button role="menuitem" class="danger" id="deleteBtn">Delete my data</button>
+      </div>
+    </header>
+
+    <main class="screen" id="loading"><p class="disclaimer">Loading…</p></main>
+
+    <main class="screen" id="none" hidden>
+      <div class="card">
+        <h2>Invite only</h2>
+        <p>This coach is in a private test. Open the personal invite link you received to get started.</p>
+      </div>
+    </main>
+
+    <main class="screen" id="gate" hidden>
+      <div class="card">
+        <h2>Before we start</h2>
+        <p id="gateText"></p>
+        <div class="stack">
+          <button class="btn" data-gate="adult">I'm 18 or over — let's start</button>
+          <button class="btn btn-ghost" data-gate="minor">I'm under 18</button>
+        </div>
+        <p class="fine">I'm an AI coach, not a doctor. In an emergency, call your local emergency number.</p>
+      </div>
+    </main>
+
+    <main class="screen" id="declined" hidden>
+      <div class="card">
+        <h2>Thanks for stopping by</h2>
+        <p>This test version is for adults only, so I can't coach you here. Nothing you shared has been saved.</p>
+        <p class="fine">If you need help with your health, a parent, school nurse or doctor is a great place to start.</p>
+      </div>
+    </main>
+
+    <main class="chat" id="chat" aria-live="polite" hidden></main>
+
+    <footer class="composer" id="composer" hidden>
+      <div class="chip" id="chip" hidden>
+        <img id="chipImg" alt="" hidden>
+        <span id="chipName"></span>
+        <button type="button" id="chipRemove" aria-label="Remove attachment">✕</button>
+      </div>
+      <form class="row" id="form">
+        <label class="sr-only" for="file">Add a photo or PDF</label>
+        <input type="file" id="file" accept="image/*,application/pdf" hidden>
+        <button type="button" class="round attach" id="attachBtn" aria-label="Add a photo or PDF" title="Photo of a meal, wearable screenshot, blood test or supplement label">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8a2 2 0 0 1 2-2h2l1.5-2h5L16 6h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><circle cx="12" cy="13" r="3.5"/></svg>
+        </button>
+        <label class="sr-only" for="msg">Message</label>
+        <textarea id="msg" rows="1" maxlength="4000" placeholder="Message your coach…" autocomplete="off"></textarea>
+        <button type="submit" class="round send" id="sendBtn" aria-label="Send" disabled>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+        </button>
+      </form>
+      <p class="disclaimer">AI coach, not a doctor — it can make mistakes. In an emergency, call your local emergency number.</p>
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,107 @@
+{
+  "$comment_file": "Health Coach Bot — User Profile Schema (Alpha v1). One profile per user, keyed on telegram_id. Fields marked REQUIRED must be present at onboarding; everything else fills in over time. See two HARD STORAGE RULES at the bottom.",
+
+  "telegram_id": "string  // KEY — unique per user",
+  "created_at": "ISO-8601",
+  "updated_at": "ISO-8601",
+
+  "profile": {
+    "display_name": "string | null",
+    "age_confirmed_18_plus": "true  // REQUIRED. No profile exists unless this is true. Store the boolean gate result ONLY — never an age or date of birth.",
+    "sex": "string | null",
+    "language": "string | null",
+    "preferences": {
+      "coaching_style": "direct | gentle | null",
+      "response_length": "brief | detailed | null"
+    }
+  },
+
+  "goals": {
+    "primary": "string | null  // REQUIRED at onboarding",
+    "secondary": ["string"],
+    "target_metrics": [
+      { "metric": "string", "target": "string", "set_date": "ISO-8601" }
+    ]
+  },
+
+  "constraints": {
+    "$comment": "REQUIRED at onboarding — must be ASKED even if the answer is 'none'. Never assume 'none' without asking.",
+    "conditions": ["string"],
+    "medications": ["string"],
+    "injuries": ["string"],
+    "allergies": ["string"],
+    "therapies": ["string  // clinical treatments that affect supplement timing, etc."],
+    "eating_disorder_flag": "boolean | null  // FLAG ONLY — turns on safe behavior. Never store details."
+  },
+
+  "nutrition": {
+    "pattern": "string | null",
+    "restrictions": ["string"],
+    "targets": {
+      "calories": "integer | null",
+      "protein_g": "integer | null",
+      "max_deficit_kcal": "500  // hard ceiling the coach must respect",
+      "set_by": "coach | user | null"
+    }
+  },
+
+  "activity": {
+    "$comment": "baseline REQUIRED at onboarding",
+    "baseline": "sedentary | light | moderate | high | null",
+    "current_training": ["string"],
+    "programs": [
+      { "name": "string", "current_stage": "string", "status": "active | paused | done" }
+    ]
+  },
+
+  "sleep": {
+    "pattern": "string | null",
+    "typical_hours": "number | null"
+  },
+
+  "supplements": [
+    {
+      "name": "string",
+      "dose": "string",
+      "timing": "string",
+      "purpose": "string",
+      "added_date": "ISO-8601"
+    }
+  ],
+
+  "lab_markers": [
+    {
+      "marker": "string",
+      "value": "number",
+      "unit": "string",
+      "date": "ISO-8601",
+      "reference_range": "string",
+      "flag": "low | normal | high | borderline"
+    }
+  ],
+
+  "wearable": {
+    "device": "string | null",
+    "metrics": [
+      { "metric": "string", "value": "number", "unit": "string", "date": "ISO-8601" }
+    ]
+  },
+
+  "food_log_summaries": [
+    {
+      "date": "ISO-8601",
+      "summary": "string",
+      "est_calories": "string",
+      "est_protein_g": "string"
+    }
+  ],
+
+  "coach_notes": [
+    { "date": "ISO-8601", "note": "string  // observed patterns, free text, e.g. 'protein consistently low on weekends'" }
+  ],
+
+  "$HARD_STORAGE_RULES": [
+    "1. Never store that a user is under 18. If a user is not confirmed 18+, no profile is created at all. Store the boolean gate result, never an actual age or date of birth.",
+    "2. Never store disordered-eating or self-harm details. The eating_disorder_flag boolean is the ONLY representation of that category — a switch that turns on safe behavior, never the details themselves."
+  ]
+}

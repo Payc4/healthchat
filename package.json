@@ -1,0 +1,13 @@
+{
+  "name": "health-coach",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Invite-only AI health coach web app (closed alpha). Claude Sonnet 5.5, no dependencies.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/unit.test.js",
+    "e2e": "node test/e2e.mjs"
+  }
+}

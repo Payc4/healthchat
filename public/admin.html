@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Admin · Health Coach</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/admin.js"></script>
+</head>
+<body>
+  <div class="admin">
+    <section id="login" hidden>
+      <h1>Admin</h1>
+      <p class="status">Owner only. Uses ADMIN_PASSWORD from Coolify.</p>
+      <div class="panel" style="margin-top:16px">
+        <form class="inline" id="loginForm">
+          <label class="sr-only" for="pw">Password</label>
+          <input type="password" id="pw" placeholder="Admin password" autocomplete="current-password" required>
+          <button class="btn" type="submit">Log in</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="main" hidden>
+      <div style="display:flex;align-items:flex-start;gap:12px">
+        <div style="flex:1">
+          <h1>Admin</h1>
+          <p class="status" id="status"></p>
+        </div>
+        <button class="btn btn-ghost btn-small" id="logout">Log out</button>
+      </div>
+
+      <h2>Invite a tester</h2>
+      <div class="panel">
+        <form class="inline" id="inviteForm">
+          <label class="sr-only" for="label">Who is it for?</label>
+          <input type="text" id="label" placeholder="Who is it for? (e.g. Tomas, gym friend)" maxlength="60">
+          <button class="btn" type="submit">Create invite link</button>
+        </form>
+        <div class="newlink" id="newlink" hidden></div>
+        <p class="status" style="margin:10px 0 0">Each link works once. Send it privately. Only add testers once the owner approves.</p>
+      </div>
+
+      <h2>Testers</h2>
+      <div class="panel scroll">
+        <table>
+          <thead><tr><th>Tester</th><th>Started</th><th>Last message</th><th>Msgs</th><th>Tokens</th><th>Onboarded</th><th></th></tr></thead>
+          <tbody id="users"></tbody>
+        </table>
+      </div>
+
+      <h2>Invite links</h2>
+      <div class="panel scroll">
+        <table>
+          <thead><tr><th>For</th><th>Created</th><th>Status</th><th></th></tr></thead>
+          <tbody id="invites"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+</body>
+</html>
