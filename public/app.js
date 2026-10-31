@@ -149,6 +149,7 @@ async function load() {
     setLimit(me.limit, me.sentToday)
     show('chat')
     scrollDown()
+    if (!tipSeen()) showTip(true)
     if (matchMedia('(min-width: 700px)').matches) $('msg').focus()
   } else if (me.state === 'gate') {
     $('gateText').textContent = me.gateText || ''
@@ -287,6 +288,7 @@ async function send() {
   const text = input.value.trim()
   if (busy || (!text && !attachment)) return
   busy = true
+  if (!$('tip').hidden) showTip(false)
   const att = attachment
   input.value = ''; grow()
   clearAttachment()
@@ -358,6 +360,17 @@ async function send() {
   updateSend()
   scrollDown()
 }
+
+// ───────── first-time tip ─────────
+
+const TIP_KEY = 'hc_tip_seen'
+function tipSeen() { try { return localStorage.getItem(TIP_KEY) === '1' } catch { return false } }
+function showTip(on) {
+  $('tip').hidden = !on
+  if (!on) { try { localStorage.setItem(TIP_KEY, '1') } catch {} }
+}
+$('tipClose').addEventListener('click', () => { showTip(false); input.focus() })
+$('helpBtn').addEventListener('click', () => { $('menu').hidden = true; showTip(true) })
 
 // ───────── menu ─────────
 

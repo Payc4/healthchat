@@ -20,6 +20,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
       </button>
       <div class="menu" id="menu" role="menu" hidden>
+        <button role="menuitem" id="helpBtn">How it works</button>
         <a href="/api/me/export" role="menuitem" download>Download my data</a>
         <button role="menuitem" class="danger" id="deleteBtn">Delete my data</button>
       </div>
@@ -57,6 +58,16 @@
     <main class="chat" id="chat" aria-live="polite" hidden></main>
 
     <footer class="composer" id="composer" hidden>
+      <div class="tip" id="tip" role="dialog" aria-labelledby="tipTitle" hidden>
+        <strong id="tipTitle">How this works</strong>
+        <ul>
+          <li><b>Just reply like you're texting.</b> Your coach asks a few questions first to get to know you, then starts coaching.</li>
+          <li><b>Tap the camera</b> to send a meal photo, a wearable screenshot, a supplement label or a blood test PDF.</li>
+          <li><b>It remembers you.</b> Come back any time on this phone and carry on.</li>
+          <li><b>⋮ top right</b> to see this again, download your data or delete it.</li>
+        </ul>
+        <button type="button" class="btn btn-small" id="tipClose">Got it</button>
+      </div>
       <div class="chip" id="chip" hidden>
         <img id="chipImg" alt="" hidden>
         <span id="chipName"></span>

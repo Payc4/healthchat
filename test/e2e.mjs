@@ -72,6 +72,18 @@ try {
   assert.equal(reuse.status, 410)
   step('age gate → profile created, first question shown, invite single-use')
 
+  // ── first-time tip ──
+  await page.waitForSelector('#tip:not([hidden])')
+  await page.screenshot({ path: join(SHOTS, '1b-tip.png') })
+  await page.click('#tipClose')
+  assert.equal(await page.isHidden('#tip'), true)
+  await page.reload(); await page.waitForSelector('#chat:not([hidden]) .msg.coach')
+  assert.equal(await page.isHidden('#tip'), true, 'tip stays closed after reload')
+  await page.click('#menuBtn'); await page.click('#helpBtn')
+  await page.waitForSelector('#tip:not([hidden])')
+  await page.click('#tipClose')
+  step('how-it-works tip: shown once, closes, reopens from the menu')
+
   // ── chat + streaming + markdown safety ──
   async function say(text) {
     const before = await page.locator('.msg.coach').count()
