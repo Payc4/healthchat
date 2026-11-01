@@ -258,7 +258,25 @@ async function chat(req, res) {
       emit('error', { message: claude.friendlyError(e) })
       return res.end()
     }
-    const reply = result.text.trim() || "Sorry — I couldn't put a reply together just now. Could you send that again?"
+    const stop = result.stop_reason
+    if (stop !== 'end_turn') console.warn(`Coach reply stop_reason=${stop} text=${result.text.length} chars, output=${result.usage.output} tokens`)
+    let reply = result.text.trim()
+    if (!reply) {
+      // Nothing to show: don't save anything, so the message can simply be sent again.
+      emit('error', {
+        message: stop === 'refusal'
+          ? "I can't help with that one. Try asking it a different way."
+          : stop === 'max_tokens'
+            ? 'That needed more room than I had. Try asking for it in smaller parts (e.g. one part of the day at a time).'
+            : 'Sorry — I couldn’t put a reply together just now. Please send that again.',
+      })
+      return res.end()
+    }
+    if (stop === 'max_tokens') {
+      const note = '\n\n_(I ran out of room there — say "continue" and I\'ll finish.)_'
+      emit('delta', { text: note })
+      reply += note
+    }
     const now = new Date().toISOString()
     const userTurn = { role: 'user', content: text || (image ? '(photo)' : '(PDF)'), attachment, ts: now }
     const coachTurn = { role: 'assistant', content: reply, ts: new Date().toISOString() }
@@ -273,7 +291,10 @@ async function chat(req, res) {
 
     // After the reply: update the profile, and fold old history into the summary.
     try {
-      const update = await coach.extract(user.profile, text, attachment, reply)
+      // Profiles that were never updated catch up from the whole conversation, once.
+      const update = !user.profile.meta.extracted_at && user.turns.length > 2
+        ? await coach.extractHistory(user.profile, user.turns)
+        : await coach.extract(user.profile, text, attachment, reply)
       if (coach.applyUpdate(user.profile, update, now) === 'delete') {
         await store.deleteUser(user.id)
         await store.forgetUserInInvites(user.id)

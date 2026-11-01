@@ -40,6 +40,9 @@ export function startMock(port = 0) {
       res.writeHead(529, { 'content-type': 'application/json' })
       return res.end(JSON.stringify({ type: 'error', error: { type: 'overloaded_error', message: 'Overloaded' } }))
     }
+    // Sonnet 5.5 can spend the whole budget thinking: no text, stop_reason max_tokens.
+    const empty = /EMPTYREPLY/.test(text)
+    const cut = /CUTREPLY/.test(text)
     const hasImage = body.messages.at(-1).content.some?.(c => c.type === 'image')
     const hasPdf = body.messages.at(-1).content.some?.(c => c.type === 'document')
     const reply = `Got it${hasImage ? ' (I can see your photo)' : ''}${hasPdf ? ' (I read your PDF)' : ''}. **Plan:**\n\n| Meal | Protein |\n|---|---|\n| Breakfast | 30 g |\n\n- one\n- two <script>alert(1)</script>\n\nWhat else?`
@@ -47,9 +50,10 @@ export function startMock(port = 0) {
     const ev = (type, data) => res.write(`event: ${type}\ndata: ${JSON.stringify({ type, ...data })}\n\n`)
     ev('message_start', { message: { usage: { input_tokens: 1000, cache_read_input_tokens: 2000 } } })
     ev('content_block_start', { index: 0, content_block: { type: 'text', text: '' } })
-    for (const piece of reply.match(/[\s\S]{1,12}/g)) { ev('content_block_delta', { index: 0, delta: { type: 'text_delta', text: piece } }); await new Promise(r => setTimeout(r, 5)) }
+    ev('content_block_delta', { index: 0, delta: { type: 'thinking_delta', thinking: 'hmm…' } })
+    if (!empty) for (const piece of reply.match(/[\s\S]{1,12}/g)) { ev('content_block_delta', { index: 0, delta: { type: 'text_delta', text: piece } }); await new Promise(r => setTimeout(r, 5)) }
     ev('content_block_stop', { index: 0 })
-    ev('message_delta', { delta: { stop_reason: 'end_turn' }, usage: { output_tokens: 80 } })
+    ev('message_delta', { delta: { stop_reason: empty || cut ? 'max_tokens' : 'end_turn' }, usage: { output_tokens: 80 } })
     ev('message_stop', {})
     res.end()
   })

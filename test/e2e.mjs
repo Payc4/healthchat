@@ -8,6 +8,7 @@ import { createRequire } from 'node:module'
 const { chromium } = createRequire(import.meta.url)('playwright') // global install is fine
 import { startMock } from './mock-claude.mjs'
 
+const coach_FOLD = 24 // lib/coach.js FOLD_AT
 const PORT = 3999
 const BASE = `http://127.0.0.1:${PORT}`
 const SHOTS = process.env.SHOTS || join(tmpdir(), 'hc-shots')
@@ -147,6 +148,23 @@ try {
   await page.fill('#msg', '')
   step('API error → friendly message, text kept, nothing saved')
 
+  // ── empty reply (all thinking, no text) and cut-off reply ──
+  await page.fill('#msg', 'EMPTYREPLY make me a schedule'); await page.click('#sendBtn')
+  await page.waitForFunction(() => document.querySelectorAll('.msg.error').length >= 2)
+  assert.match(await page.locator('.msg.error').last().textContent(), /more room/)
+  u = await userFile()
+  assert.ok(!u.turns.some(t => /EMPTYREPLY|couldn/.test(t.content)), 'empty reply not saved')
+  await page.fill('#msg', '')
+  await say('CUTREPLY long plan please')
+  assert.match(await page.locator('.msg.coach').last().textContent(), /say "continue"/)
+  const chatReq = (await requests()).filter(r => r.stream).at(-1)
+  assert.equal(chatReq.max_tokens, 16000)
+  assert.equal(chatReq.output_config.effort, 'medium')
+  const toolReq = (await requests()).filter(r => r.tools).at(-1)
+  assert.equal(toolReq.tool_choice.type, 'auto')
+  assert.equal(toolReq.thinking.type, 'between_tools')
+  step('empty reply → clear message, nothing saved; cut-off reply → "continue" note; token room + effort set')
+
   // ── memory across sessions ──
   await page.reload()
   await page.waitForSelector('#chat:not([hidden]) .msg.coach')
@@ -158,7 +176,7 @@ try {
   for (let i = 0; i < 9; i++) await say(`message number ${i}`)
   u = await userFile()
   assert.ok(u.summary.startsWith('SUMMARY'), 'summary written')
-  assert.ok(u.turns.length <= 14, 'old turns folded, got ' + u.turns.length)
+  assert.ok(u.turns.length <= coach_FOLD, 'old turns folded, got ' + u.turns.length)
   await say('what do you remember?')
   coachReq = (await requests()).filter(r => r.stream).at(-1)
   assert.match(coachReq.system[1].text, /EARLIER CONVERSATION/)

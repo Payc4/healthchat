@@ -18,6 +18,7 @@ Testers open a one-time invite link, confirm they are 18+ (buttons), then chat. 
 | `SESSION_SECRET` | yes | Long random string (`openssl rand -hex 32`). Keeps testers logged in across redeploys. |
 | `CLAUDE_MODEL` | no | Default `claude-sonnet-5-5`. |
 | `DAILY_MESSAGE_LIMIT` | no | Messages per tester per day, default `60`. |
+| `COACH_EFFORT` | no | How hard the coach thinks before replying: `low`, `medium` (default), `high`. Higher is slower and costs more. |
 | `APP_NAME` | no | Shown in the header, default `Health Coach`. |
 
 5. Deploy, open `https://<domain>/admin`, log in, create an invite link, and send it to a tester.

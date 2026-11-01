@@ -10,6 +10,15 @@ test('system prompt is the owner text, verbatim, after the --- line', () => {
   assert.ok(!coach.STATIC_PROMPT.startsWith('---'))
 })
 
+test('no tool call → nothing applied; a real update marks the profile as caught up', () => {
+  const p = coach.newProfile(null, now)
+  assert.equal(coach.applyUpdate(p, null, now), 'ok')
+  assert.equal(p.meta.extracted_at, undefined)
+  coach.applyUpdate(p, { supplements_add: [{ name: 'Magnesium', dose: '300 mg' }] }, now)
+  assert.equal(p.meta.extracted_at, now)
+  assert.equal(p.supplements[0].name, 'Magnesium')
+})
+
 test('under 18 → delete, nothing applied', () => {
   const p = coach.newProfile(null, now)
   assert.equal(coach.applyUpdate(p, { under_18: true, display_name: 'Kid' }, now), 'delete')
