@@ -18,7 +18,7 @@ Decisions made while building, on top of the owner's settled decisions in `open_
 ## Still needs the owner
 
 - **Data retention**: how long to keep inactive testers (nothing is auto-deleted now).
-- **Monitoring**: who may read conversations. The admin page shows usage only; there's no transcript viewer, on purpose.
+- **Monitoring**: the admin page can now show each tester's chat and the coach's memory (**View chat**), added for debugging on 2026-11-13. The owner should confirm who may use it, and testers should be told their chats can be read by the team. `ADMIN_READ_CHATS=off` hides it.
 - **Languages**: the coach answers in the user's language (LT/EN). Confirm this is wanted.
 - **Crisis lines**: still the placeholder plus findahelpline.com. Fill in Lithuanian numbers before a wider release.
 - **Consent / DPA**: required before anyone outside the trusted circle joins.

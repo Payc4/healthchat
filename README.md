@@ -18,6 +18,7 @@ Testers open a one-time invite link, confirm they are 18+ (buttons), then chat. 
 | `SESSION_SECRET` | yes | Long random string (`openssl rand -hex 32`). Keeps testers logged in across redeploys. |
 | `CLAUDE_MODEL` | no | Default `claude-sonnet-5-5`. |
 | `DAILY_MESSAGE_LIMIT` | no | Messages per tester per day, default `60`. |
+| `ADMIN_READ_CHATS` | no | Admin can read each tester's chat and what the coach remembers (for debugging). On by default; set to `off` to hide chats. |
 | `COACH_EFFORT` | no | How hard the coach thinks before replying: `low`, `medium` (default), `high`. Higher is slower and costs more. |
 | `APP_NAME` | no | Shown in the header, default `Health Coach`. |
 
@@ -27,7 +28,7 @@ Health check: `GET /health`.
 
 ## Using it
 
-- **/admin**: create one-time invite links; see testers, messages and token use; create a **login link** for an existing tester (new phone or cleared browser); delete a tester.
+- **/admin**: create one-time invite links; see testers, messages and token use; **View chat** (a tester's full chat plus the profile and summary the coach works from, for debugging); create a **login link** for an existing tester (new phone or cleared browser); delete a tester.
 - **Tester menu (⋮)**: *Download my data* (JSON) and *Delete my data* (everything, immediately).
 - Photos are resized in the browser (max 1568 px, JPEG). PDFs can be up to 10 MB. Photos and PDFs are sent to Claude once and **never saved**; only what the coach extracted from them is kept (e.g. a lab marker or a meal estimate).
 

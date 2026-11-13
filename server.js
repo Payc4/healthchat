@@ -3,7 +3,8 @@
 // Env: ANTHROPIC_API_KEY (required for replies), ADMIN_PASSWORD (required for /admin),
 //      SESSION_SECRET (long random string; keeps people logged in across restarts),
 //      CLAUDE_MODEL (default claude-sonnet-5-5), DAILY_MESSAGE_LIMIT (default 60),
-//      APP_NAME (default "Health Coach"), DATA_DIR (default ./data), PORT (default 3000).
+//      APP_NAME (default "Health Coach"), DATA_DIR (default ./data), PORT (default 3000),
+//      COACH_EFFORT (default medium), ADMIN_READ_CHATS (set to off to hide testers' chats from admin).
 
 import { createServer } from 'node:http'
 import { readFile } from 'node:fs/promises'
@@ -25,6 +26,7 @@ const LOG_LIMIT = 400
 
 if (!process.env.SESSION_SECRET) console.warn('SESSION_SECRET is not set: everyone is logged out on every restart. Set it in Coolify.')
 if (!ADMIN_PASSWORD) console.warn('ADMIN_PASSWORD is not set: /admin is disabled.')
+const CAN_READ_CHATS = process.env.ADMIN_READ_CHATS !== 'off'
 if (!claude.configured()) console.warn('ANTHROPIC_API_KEY is not set: the coach cannot reply.')
 
 await store.init()
@@ -192,7 +194,23 @@ async function admin(req, res, action) {
       onboarded: Boolean(u.profile.goals.primary && u.profile.meta.constraints_asked),
     }))
     const invites = (await store.listInvites()).slice().reverse().map(i => ({ ...i, url: `${base}/join/${i.token}` }))
-    return send(res, 200, { users, invites, model: claude.MODEL, aiReady: claude.configured(), limit: DAILY_LIMIT, persistentSessions: Boolean(process.env.SESSION_SECRET) })
+    return send(res, 200, { users, invites, model: claude.MODEL, aiReady: claude.configured(), limit: DAILY_LIMIT, persistentSessions: Boolean(process.env.SESSION_SECRET), canReadChats: CAN_READ_CHATS })
+  }
+  // Read one tester's chat and what the coach remembers (for debugging). Off with ADMIN_READ_CHATS=off.
+  if (action === 'chat' && req.method === 'GET') {
+    if (!CAN_READ_CHATS) return send(res, 403, { error: 'Reading chats is turned off (ADMIN_READ_CHATS=off).' })
+    const user = await store.getUser(new URL(req.url, 'http://x').searchParams.get('user_id'))
+    if (!user) return send(res, 404, { error: 'Tester not found.' })
+    console.log(`Admin viewed chat of tester ${user.id}`)
+    return send(res, 200, {
+      id: user.id,
+      label: user.label,
+      name: user.profile.profile.display_name,
+      created_at: user.created_at,
+      log: user.log || [],
+      memory: { recent_messages: user.turns.length, summary: user.summary || '', profile: user.profile },
+      stats: user.stats,
+    })
   }
   if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed.' })
   const body = await readJson(req)

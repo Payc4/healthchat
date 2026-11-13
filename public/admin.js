@@ -53,6 +53,7 @@ async function refresh() {
       <td>${u.tokens.toLocaleString()}</td>
       <td>${u.onboarded ? '<span class="pill">Yes</span>' : '<span class="pill off">Not yet</span>'}</td>
       <td><div class="acts">
+        ${s.canReadChats ? `<button class="btn btn-small" data-chat="${esc(u.id)}">View chat</button>` : ''}
         <button class="btn btn-ghost btn-small" data-relink="${esc(u.id)}" title="New one-time link that logs this tester back in (new phone, cleared browser)">Login link</button>
         <button class="btn btn-danger btn-small" data-deluser="${esc(u.id)}" data-name="${esc(u.name || u.label || 'this tester')}">Delete</button>
       </div></td>
@@ -65,10 +66,32 @@ async function refresh() {
       <td>${i.used_at ? `<span class="pill">Used ${when(i.used_at)}</span>` : '<span class="pill off">Not used yet</span>'}</td>
       <td><div class="acts">
         ${i.used_at ? '' : `<button class="btn btn-ghost btn-small" data-copy="${esc(i.url)}">Copy</button>`}
+        ${s.canReadChats && i.user_id && s.users.some(u => u.id === i.user_id) ? `<button class="btn btn-small" data-chat="${esc(i.user_id)}">View chat</button>` : ''}
         <button class="btn btn-ghost btn-small" data-delinv="${esc(i.token)}">Remove</button>
       </div></td>
     </tr>`).join('') : '<tr><td colspan="4" class="status">No invite links.</td></tr>'
 }
+
+// ───────── chat viewer (debugging) ─────────
+let viewing = null
+async function openChat(id) {
+  viewing = id
+  const c = await api('chat?user_id=' + encodeURIComponent(id))
+  $('chatView').hidden = false
+  $('cvTitle').textContent = c.name ? `${c.name} — ${c.label || 'Tester'}` : (c.label || 'Tester')
+  const n = c.log.filter(m => m.role === 'user').length
+  $('cvMeta').textContent = `Joined ${when(c.created_at)} · ${n} message${n === 1 ? '' : 's'} sent · ${((c.stats?.input_tokens || 0) + (c.stats?.output_tokens || 0)).toLocaleString()} tokens`
+  $('cvLog').innerHTML = c.log.length ? c.log.map(m => `
+    <div class="msg ${m.role === 'user' ? 'me' : 'coach'}">${m.attachment ? `<span class="att">${m.attachment === 'photo' ? '📷 Photo' : '📄 PDF'}</span><br>` : ''}${esc(m.content === '(photo)' || m.content === '(PDF)' ? '' : m.content)}<span class="ts">${when(m.ts)}</span></div>`).join('')
+    : '<p class="status">No messages yet.</p>'
+  $('cvMemMeta').textContent = `The coach sees the last ${c.memory.recent_messages} messages word for word, plus the summary and profile below. Photos and PDFs are not kept.`
+  $('cvSummary').textContent = c.memory.summary || '(none yet — written once the chat gets long)'
+  $('cvProfile').textContent = JSON.stringify(c.memory.profile, null, 2)
+  $('cvLog').scrollTop = $('cvLog').scrollHeight
+  $('chatView').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+$('cvClose').addEventListener('click', () => { $('chatView').hidden = true; viewing = null })
+$('cvRefresh').addEventListener('click', () => viewing && openChat(viewing).catch(e => toast(e.message)))
 
 $('loginForm').addEventListener('submit', async e => {
   e.preventDefault()
@@ -90,6 +113,7 @@ document.addEventListener('click', async e => {
   if (!b) return
   try {
     if (b.dataset.copy) return copy(b.dataset.copy)
+    if (b.dataset.chat) return openChat(b.dataset.chat)
     if (b.dataset.relink) {
       const r = await api('relink', { user_id: b.dataset.relink })
       showLink(r.url, 'Login link for this tester (works once):')

@@ -200,6 +200,19 @@ try {
   assert.match(await phone2.textContent('#chat'), /my name is Tomas/)
   step('admin list + login link logs the same tester in on a new device')
 
+  // ── admin can read the chat (debugging) ──
+  await admin.click('#users [data-chat]')
+  await admin.waitForSelector('#chatView:not([hidden]) .cv-log .msg')
+  assert.match(await admin.textContent('#cvLog'), /my name is Tomas/)
+  assert.equal(await admin.locator('#cvLog script').count(), 0)
+  assert.match(await admin.textContent('#cvProfile'), /"display_name": "Tomas"/)
+  assert.ok(await admin.locator('#invites [data-chat]').count() >= 1, 'View chat on the used invite too')
+  const noAdmin = await phone2.evaluate(async id => (await fetch('/api/admin/chat?user_id=' + id)).status, u.id)
+  assert.equal(noAdmin, 401)
+  await admin.setViewportSize({ width: 390, height: 844 }); await admin.screenshot({ path: join(SHOTS, '7-admin-chat.png'), fullPage: true })
+  await admin.setViewportSize({ width: 1280, height: 800 })
+  step('admin: View chat shows messages + profile; testers can\'t call it')
+
   // ── delete my data ──
   await page.click('#menuBtn'); await page.click('#deleteBtn')
   await page.waitForSelector('#none:not([hidden])')

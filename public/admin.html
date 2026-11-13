@@ -51,6 +51,23 @@
         </table>
       </div>
 
+      <section id="chatView" class="panel chatview" hidden>
+        <div class="cv-head">
+          <div style="flex:1"><h2 id="cvTitle" style="margin:0">Chat</h2><p class="status" id="cvMeta" style="margin:2px 0 0"></p></div>
+          <button class="btn btn-ghost btn-small" id="cvRefresh">Refresh</button>
+          <button class="btn btn-ghost btn-small" id="cvClose">Close</button>
+        </div>
+        <div class="cv-log" id="cvLog"></div>
+        <details class="cv-mem">
+          <summary>What the coach remembers</summary>
+          <p class="status" id="cvMemMeta"></p>
+          <h3>Summary of older messages</h3>
+          <pre id="cvSummary"></pre>
+          <h3>Profile</h3>
+          <pre id="cvProfile"></pre>
+        </details>
+      </section>
+
       <h2>Invite links</h2>
       <div class="panel scroll">
         <table>
