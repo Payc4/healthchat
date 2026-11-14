@@ -13,6 +13,7 @@ import { extname, join } from 'node:path'
 import * as store from './lib/store.js'
 import * as claude from './lib/claude.js'
 import * as coach from './lib/coach.js'
+import * as auth from './lib/auth.js'
 
 const PORT = Number(process.env.PORT || 3000)
 const APP_NAME = process.env.APP_NAME || 'Health Coach'
@@ -46,7 +47,24 @@ const isHttps = req => req.headers['x-forwarded-proto'] === 'https'
 function cookie(req, name, value, maxAgeDays, sameSite = 'Lax') {
   return `${name}=${encodeURIComponent(value)}; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=${Math.round(maxAgeDays * 86400)}${isHttps(req) ? '; Secure' : ''}`
 }
-const sessionUserId = req => unsign(cookies(req).hc_session)
+// Session cookie = signed "<userId>:<version>". Bumping account.sv (password change, "log out
+// everywhere") ends every other session. Old cookies without a version count as version 0.
+const sessionValue = user => sign(`${user.id}:${user.account?.sv || 0}`)
+async function sessionUser(req) {
+  const v = unsign(cookies(req).hc_session)
+  if (!v) return null
+  const [id, sv = '0'] = v.split(':')
+  const user = await store.getUser(id)
+  return user && String(user.account?.sv || 0) === sv ? user : null
+}
+/** Set by a login link from the admin page: lets that person choose a new password without the old one. */
+function resetAllowed(req, user) {
+  const v = unsign(cookies(req).hc_reset)
+  if (!v) return false
+  const [id, until] = v.split(':')
+  return id === user.id && Number(until) > Date.now()
+}
+const loginLimit = auth.limiter(8, 15)
 const pendingInvite = req => unsign(cookies(req).hc_invite)
 const isAdmin = req => Boolean(ADMIN_PASSWORD) && unsign(cookies(req).hc_admin) === 'admin'
 
@@ -104,26 +122,38 @@ async function handle(req, res) {
     if (!inv || inv.used_at) return send(res, 410, page('This invite link has already been used or is no longer valid. Ask for a new one.'))
     if (inv.user_id && (await store.getUser(inv.user_id))) {
       // Login link for an existing tester (new phone, cleared cookies).
+      // It also opens a 1-hour window to set a new password (there's no reset email).
       await store.useInvite(inv.token)
-      res.writeHead(303, { location: '/', 'set-cookie': [cookie(req, 'hc_session', sign(inv.user_id), 365), cookie(req, 'hc_invite', '', 0)] })
+      const user = await store.getUser(inv.user_id)
+      res.writeHead(303, { location: '/app', 'set-cookie': [cookie(req, 'hc_session', sessionValue(user), 365), cookie(req, 'hc_invite', '', 0), cookie(req, 'hc_reset', sign(`${user.id}:${Date.now() + 3600e3}`), 1 / 24)] })
       return res.end()
     }
-    res.writeHead(303, { location: '/', 'set-cookie': cookie(req, 'hc_invite', sign(inv.token), 7) })
+    res.writeHead(303, { location: '/app', 'set-cookie': cookie(req, 'hc_invite', sign(inv.token), 7) })
     return res.end()
   }
 
-  if (path === '/' || path === '/index.html') return sendFile(res, 'index.html')
+  // Pages. Logged-in people skip the landing and login pages.
+  if (path === '/' || path === '/login') {
+    if (await sessionUser(req)) return redirect(res, '/app')
+    return sendFile(res, path === '/' ? 'landing.html' : 'login.html')
+  }
+  if (path === '/app' || path === '/index.html') return sendFile(res, 'index.html')
+  if (path === '/profile') {
+    if (!(await sessionUser(req))) return redirect(res, '/login')
+    return sendFile(res, 'profile.html')
+  }
   if (path === '/admin') return sendFile(res, 'admin.html')
-  if (['/app.js', '/admin.js', '/styles.css', '/favicon.svg', '/manifest.webmanifest'].includes(path)) return sendFile(res, path.slice(1))
+  if (['/app.js', '/admin.js', '/login.js', '/profile.js', '/styles.css', '/favicon.svg', '/manifest.webmanifest'].includes(path)) return sendFile(res, path.slice(1))
 
   if (!path.startsWith('/api/')) return send(res, 404, page('Page not found.'))
   if (req.method === 'POST' && !sameOrigin(req)) return send(res, 403, { error: 'Forbidden.' })
 
   // ── user ──
   if (path === '/api/me' && req.method === 'GET') {
-    const id = sessionUserId(req)
-    const user = id && (await store.getUser(id))
-    if (user) return send(res, 200, { state: 'active', appName: APP_NAME, name: user.profile.profile.display_name, log: logView(user), summarised: Boolean(user.summary), limit: DAILY_LIMIT, sentToday: sentToday(user) })
+    const user = await sessionUser(req)
+    if (user && !user.account?.email) return send(res, 200, { state: 'claim', appName: APP_NAME, name: user.profile.profile.display_name })
+    if (user && resetAllowed(req, user)) return send(res, 200, { state: 'reset', appName: APP_NAME, email: user.account.email })
+    if (user) return send(res, 200, { state: 'active', appName: APP_NAME, name: user.account.name || user.profile.profile.display_name, log: logView(user), summarised: Boolean(user.summary), limit: DAILY_LIMIT, sentToday: sentToday(user) })
     const token = pendingInvite(req)
     const inv = token && (await store.findInvite(token))
     if (inv && !inv.used_at) return send(res, 200, { state: 'gate', appName: APP_NAME, gateText: coach.AGE_GATE_TEXT })
@@ -141,27 +171,72 @@ async function handle(req, res) {
       return send(res, 200, { state: 'declined' }, { 'set-cookie': cookie(req, 'hc_invite', '', 0) })
     }
     if (answer !== 'adult') return send(res, 400, { error: 'Please choose one of the buttons.' })
-    const id = store.newId()
-    if (!(await store.useInvite(inv.token, id))) return send(res, 410, { error: 'This invite was just used. Ask for a new link.' })
-    const now = new Date().toISOString()
-    const first = { role: 'assistant', content: coach.FIRST_QUESTION, ts: now }
-    await store.saveUser({ id, label: inv.label, created_at: now, profile: coach.newProfile(null, now), turns: [first], log: [first], summary: '', stats: { messages: 0, input_tokens: 0, output_tokens: 0 } })
-    return send(res, 200, { state: 'active' }, { 'set-cookie': [cookie(req, 'hc_session', sign(id), 365), cookie(req, 'hc_invite', '', 0)] })
+    // Nothing is stored yet: the account is created on the next step.
+    return send(res, 200, { state: 'signup' })
+  }
+
+  // ── accounts ──
+  if (path === '/api/signup' && req.method === 'POST') {
+    const token = pendingInvite(req)
+    const inv = token && (await store.findInvite(token))
+    if (!inv || inv.used_at) return send(res, 410, { error: 'This invite is no longer valid. Ask for a new link.' })
+    const body = await readJson(req)
+    if (body.adult !== true) return send(res, 400, { error: 'Please confirm you are 18 or over.' })
+    const name = String(body.name || '').trim().slice(0, 60)
+    const email = auth.normalizeEmail(body.email)
+    if (!name) return send(res, 400, { error: 'Please add your first name.' })
+    if (!auth.validEmail(email)) return send(res, 400, { error: 'Please enter a valid email address.' })
+    const bad = auth.passwordProblem(body.password)
+    if (bad) return send(res, 400, { error: bad })
+    const hash = await auth.hashPassword(body.password)
+    return store.withLock('emails', async () => {
+      if (await store.findUserByEmail(email)) return send(res, 409, { error: 'There is already an account with this email. Log in instead.' })
+      const id = store.newId()
+      if (!(await store.useInvite(inv.token, id))) return send(res, 410, { error: 'This invite was just used. Ask for a new link.' })
+      const now = new Date().toISOString()
+      const first = { role: 'assistant', content: coach.FIRST_QUESTION.replace(/^Thanks!/, `Thanks, ${name}!`), ts: now }
+      const user = { id, label: inv.label, created_at: now, account: { email, name, password_hash: hash, sv: 0 }, profile: coach.newProfile(name, now), turns: [first], log: [first], summary: '', stats: { messages: 0, input_tokens: 0, output_tokens: 0 } }
+      await store.saveUser(user)
+      return send(res, 200, { ok: true }, { 'set-cookie': [cookie(req, 'hc_session', sessionValue(user), 365), cookie(req, 'hc_invite', '', 0)] })
+    })
+  }
+
+  if (path === '/api/login' && req.method === 'POST') {
+    const body = await readJson(req)
+    const email = auth.normalizeEmail(body.email)
+    const key = `${req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket.remoteAddress}|${email}`
+    if (loginLimit.blocked(key)) return send(res, 429, { error: 'Too many attempts. Wait 15 minutes, or ask for a login link.' })
+    const user = await store.findUserByEmail(email)
+    const ok = user ? await auth.verifyPassword(body.password || '', user.account.password_hash) : await auth.burnTime(body.password || '')
+    if (!ok) { loginLimit.fail(key); return send(res, 401, { error: 'That email and password don’t match. Check them and try again.' }) }
+    loginLimit.clear(key)
+    return send(res, 200, { ok: true }, { 'set-cookie': [cookie(req, 'hc_session', sessionValue(user), 365), cookie(req, 'hc_invite', '', 0)] })
+  }
+
+  if (path === '/api/logout' && req.method === 'POST') {
+    return send(res, 200, { ok: true }, { 'set-cookie': [cookie(req, 'hc_session', '', 0), cookie(req, 'hc_reset', '', 0)] })
+  }
+
+  if (path.startsWith('/api/account/') || path === '/api/dashboard' || path.startsWith('/api/profile/')) {
+    const user = await sessionUser(req)
+    if (!user) return send(res, 401, { error: 'Please log in again.' })
+    return store.withLock(user.id, async () => account(req, res, path, await store.getUser(user.id)))
   }
 
   if (path === '/api/chat' && req.method === 'POST') return chat(req, res)
 
   if (path === '/api/me/export' && req.method === 'GET') {
-    const user = await store.getUser(sessionUserId(req))
+    const user = await sessionUser(req)
     if (!user) return send(res, 401, { error: 'Not signed in.' })
-    const { id, ...data } = user
+    const { id, account: acc, ...data } = user
+    data.account = { email: acc?.email || null, name: acc?.name || null }
     return send(res, 200, data, { 'content-disposition': 'attachment; filename="my-health-coach-data.json"' })
   }
 
   if (path === '/api/me/delete' && req.method === 'POST') {
-    const id = sessionUserId(req)
-    if (id) await store.withLock(id, async () => { await store.deleteUser(id); await store.forgetUserInInvites(id) })
-    return send(res, 200, { ok: true }, { 'set-cookie': cookie(req, 'hc_session', '', 0) })
+    const user = await sessionUser(req)
+    if (user) await store.withLock(user.id, async () => { await store.deleteUser(user.id); await store.forgetUserInInvites(user.id) })
+    return send(res, 200, { ok: true }, { 'set-cookie': [cookie(req, 'hc_session', '', 0), cookie(req, 'hc_reset', '', 0)] })
   }
 
   // ── admin ──
@@ -186,7 +261,8 @@ async function admin(req, res, action) {
     const users = (await store.listUsers()).map(u => ({
       id: u.id,
       label: u.label,
-      name: u.profile.profile.display_name,
+      name: u.account?.name || u.profile.profile.display_name,
+      email: u.account?.email || null,
       created_at: u.created_at,
       last_active: (u.log || []).filter(t => t.role === 'user').pop()?.ts || null,
       messages: u.stats?.messages || 0,
@@ -235,11 +311,138 @@ async function admin(req, res, action) {
   return send(res, 404, { error: 'Unknown action.' })
 }
 
+// ───────────── account + dashboard ─────────────
+
+// Lists in the profile that a person may remove items from, from their dashboard.
+const REMOVABLE = ['goals.secondary', 'constraints.conditions', 'constraints.medications', 'constraints.injuries', 'constraints.allergies',
+  'constraints.therapies', 'nutrition.restrictions', 'activity.current_training', 'supplements', 'lab_markers', 'wearable.metrics',
+  'food_log_summaries', 'coach_notes']
+// Single values they may change.
+const EDITABLE = {
+  'goals.primary': v => (v === null || v === '' ? null : String(v).trim().slice(0, 200) || null),
+  'profile.preferences.coaching_style': v => (['direct', 'gentle'].includes(v) ? v : null),
+  'profile.preferences.response_length': v => (['brief', 'detailed'].includes(v) ? v : null),
+}
+const at = (obj, path) => path.split('.').reduce((o, k) => o?.[k], obj)
+function put(obj, path, value) {
+  const keys = path.split('.'); const last = keys.pop()
+  keys.reduce((o, k) => o[k], obj)[last] = value
+}
+
+/** What the dashboard shows. The eating-disorder flag is never sent (it's only used by the coach). */
+function dashboard(user) {
+  const days = new Map()
+  let photos = 0, pdfs = 0
+  for (const t of user.log || []) {
+    if (t.role !== 'user') continue
+    const d = t.ts.slice(0, 10)
+    days.set(d, (days.get(d) || 0) + 1)
+    if (t.attachment === 'photo') photos++
+    if (t.attachment === 'PDF') pdfs++
+  }
+  const day = n => new Date(Date.now() - n * 86400e3).toISOString().slice(0, 10)
+  let streak = 0
+  for (let n = days.has(day(0)) ? 0 : 1; days.has(day(n)); n++) streak++
+  const { meta, ...profile } = structuredClone(user.profile)
+  delete profile.constraints.eating_disorder_flag
+  delete profile.profile.age_confirmed_18_plus
+  return {
+    account: { name: user.account?.name || user.profile.profile.display_name || '', email: user.account?.email || '', created_at: user.created_at },
+    stats: {
+      messages: user.stats?.messages || 0,
+      days_active: days.size,
+      streak,
+      photos,
+      pdfs,
+      last14: Array.from({ length: 14 }, (_, i) => { const d = day(13 - i); return { date: d, count: days.get(d) || 0 } }),
+    },
+    profile,
+    memory: { summarised: Boolean(user.summary) },
+  }
+}
+
+async function account(req, res, path, user) {
+  if (path === '/api/dashboard' && req.method === 'GET') return send(res, 200, dashboard(user))
+  if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed.' })
+  const body = await readJson(req)
+  const save = async (extraCookies = []) => { await store.saveUser(user); return send(res, 200, { ok: true, ...dashboard(user) }, extraCookies.length ? { 'set-cookie': extraCookies } : {}) }
+  const checkPassword = async () => user.account?.password_hash && (await auth.verifyPassword(body.password || '', user.account.password_hash))
+  const takeEmail = email => store.withLock('emails', async () => {
+    const other = await store.findUserByEmail(email)
+    return !other || other.id === user.id
+  })
+
+  // Testers from before accounts existed: add email + password once.
+  if (path === '/api/account/claim') {
+    if (user.account?.email) return send(res, 400, { error: 'Your login is already set up.' })
+    const name = String(body.name || '').trim().slice(0, 60)
+    const email = auth.normalizeEmail(body.email)
+    if (!name) return send(res, 400, { error: 'Please add your first name.' })
+    if (!auth.validEmail(email)) return send(res, 400, { error: 'Please enter a valid email address.' })
+    const bad = auth.passwordProblem(body.password)
+    if (bad) return send(res, 400, { error: bad })
+    if (!(await takeEmail(email))) return send(res, 409, { error: 'That email is already used by another account.' })
+    user.account = { email, name, password_hash: await auth.hashPassword(body.password), sv: user.account?.sv || 0 }
+    if (!user.profile.profile.display_name) user.profile.profile.display_name = name
+    return save([cookie(req, 'hc_session', sessionValue(user), 365)])
+  }
+  if (!user.account?.email) return send(res, 403, { error: 'Please set up your login first.' })
+  if (path === '/api/account/name') {
+    const name = String(body.name || '').trim().slice(0, 60)
+    if (!name) return send(res, 400, { error: 'Please enter a name.' })
+    user.account.name = name
+    user.profile.profile.display_name = name
+    return save()
+  }
+  if (path === '/api/account/email') {
+    const email = auth.normalizeEmail(body.email)
+    if (!auth.validEmail(email)) return send(res, 400, { error: 'Please enter a valid email address.' })
+    if (!(await checkPassword())) return send(res, 403, { error: 'Your current password isn’t right.' })
+    if (!(await takeEmail(email))) return send(res, 409, { error: 'That email is already used by another account.' })
+    user.account.email = email
+    return save()
+  }
+  if (path === '/api/account/password') {
+    const resetting = resetAllowed(req, user)
+    if (!resetting && !(await checkPassword())) return send(res, 403, { error: 'Your current password isn’t right.' })
+    const bad = auth.passwordProblem(body.new_password)
+    if (bad) return send(res, 400, { error: bad })
+    user.account.password_hash = await auth.hashPassword(body.new_password)
+    user.account.sv = (user.account.sv || 0) + 1 // logs out every other device
+    return save([cookie(req, 'hc_session', sessionValue(user), 365), cookie(req, 'hc_reset', '', 0)])
+  }
+  if (path === '/api/account/skip-reset') return send(res, 200, { ok: true }, { 'set-cookie': cookie(req, 'hc_reset', '', 0) })
+  if (path === '/api/account/logout-others') {
+    user.account.sv = (user.account.sv || 0) + 1
+    return save([cookie(req, 'hc_session', sessionValue(user), 365)])
+  }
+
+  // Corrections to what the coach saved.
+  if (path === '/api/profile/remove') {
+    if (!REMOVABLE.includes(body.list)) return send(res, 400, { error: 'That can’t be removed here.' })
+    const list = at(user.profile, body.list)
+    const i = Number(body.index)
+    // `item` must still match, so a stale page can't remove the wrong thing.
+    if (!Array.isArray(list) || !(i >= 0 && i < list.length) || JSON.stringify(list[i]) !== JSON.stringify(body.item)) return send(res, 409, { error: 'This changed in the meantime. Reload the page and try again.' })
+    list.splice(i, 1)
+    return save()
+  }
+  if (path === '/api/profile/set') {
+    const clean = EDITABLE[body.field]
+    if (!clean) return send(res, 400, { error: 'That can’t be changed here.' })
+    put(user.profile, body.field, clean(body.value))
+    return save()
+  }
+  return send(res, 404, { error: 'Not found.' })
+}
+
 // ───────────── chat ─────────────
 
 async function chat(req, res) {
-  const id = sessionUserId(req)
-  if (!id || !(await store.getUser(id))) return send(res, 401, { error: 'Your session ended. Open your invite link again.' })
+  const me = await sessionUser(req)
+  if (!me) return send(res, 401, { error: 'Your session ended. Please log in again.' })
+  if (!me.account?.email) return send(res, 403, { error: 'Please set up your login first.' })
+  const id = me.id
   let msg
   try { msg = await readJson(req, MAX_CHAT_BYTES) } catch (e) { return send(res, e.status || 400, { error: e.message }) }
   const text = String(msg.text || '').trim().slice(0, 4000)
@@ -323,6 +526,8 @@ async function chat(req, res) {
     await store.saveUser(user)
   })
 }
+
+const redirect = (res, location) => { res.writeHead(303, { location, 'cache-control': 'no-store' }); res.end() }
 
 function page(message) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="robots" content="noindex"><title>${APP_NAME}</title><link rel="stylesheet" href="/styles.css"></head>

@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#1f6f5c">
+  <title>Your profile · Health Coach</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/profile.js"></script>
+</head>
+<body>
+  <header class="top">
+    <a class="mark" href="/app" aria-label="Back to your coach"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg></a>
+    <h1>Your profile<small id="sub">Health Coach</small></h1>
+    <a class="btn btn-small" href="/app">Back to chat</a>
+  </header>
+
+  <main class="dash">
+    <div class="tabs" role="tablist" aria-label="Profile sections">
+      <button role="tab" id="tab-progress" aria-controls="progress" aria-selected="true">Progress</button>
+      <button role="tab" id="tab-knows" aria-controls="knows" aria-selected="false">What it knows</button>
+      <button role="tab" id="tab-account" aria-controls="account" aria-selected="false">Account</button>
+    </div>
+    <div class="form-error" id="err" role="alert" hidden></div>
+
+    <!-- Progress -->
+    <section id="progress" role="tabpanel" aria-labelledby="tab-progress">
+      <div class="stats">
+        <div class="stat"><b id="sDays">–</b><span>days active</span></div>
+        <div class="stat"><b id="sStreak">–</b><span>day streak</span></div>
+        <div class="stat"><b id="sMsgs">–</b><span>messages sent</span></div>
+        <div class="stat"><b id="sFiles">–</b><span>photos &amp; PDFs shared</span></div>
+      </div>
+      <div class="panel2">
+        <h2>Last 14 days</h2>
+        <p class="sub">Messages you sent each day.</p>
+        <div class="bars" id="bars" role="img" aria-label="Messages per day, last 14 days"></div>
+        <div class="bar-labels" id="barLabels" aria-hidden="true"></div>
+      </div>
+      <div class="panel2">
+        <h2>Your goal</h2>
+        <p id="pGoal" class="empty"></p>
+      </div>
+      <div class="panel2">
+        <h2>Your latest numbers</h2>
+        <p class="sub">From screenshots, lab results and what you've told your coach.</p>
+        <div id="pNumbers"></div>
+      </div>
+      <p class="fine" id="since" style="text-align:center;color:var(--muted);font-size:13px"></p>
+    </section>
+
+    <!-- What your coach knows -->
+    <section id="knows" role="tabpanel" aria-labelledby="tab-knows" hidden>
+      <div class="panel2" style="background:var(--accent-soft);box-shadow:none">
+        <p style="margin:0;font-size:15px">Your coach saves this from your chats so it can give advice that fits you. If something's wrong, remove it here, or just tell your coach in the chat.</p>
+      </div>
+      <div id="knowsBody"></div>
+    </section>
+
+    <!-- Account -->
+    <section id="account" role="tabpanel" aria-labelledby="tab-account" hidden>
+      <div class="panel2">
+        <h2>Your name</h2>
+        <form class="inline-edit" id="nameForm"><label class="sr-only" for="aName">Name</label><input id="aName" maxlength="60" autocomplete="given-name"><button class="btn btn-small" type="submit">Save</button></form>
+      </div>
+      <div class="panel2">
+        <h2>Email address</h2>
+        <p class="sub">You log in with this.</p>
+        <form class="form" id="emailForm" style="margin-top:0">
+          <div class="field"><label for="aEmail">Email</label><input type="email" id="aEmail" autocomplete="email" inputmode="email" autocapitalize="none"></div>
+          <div class="field"><label for="aEmailPass">Current password</label><input type="password" id="aEmailPass" autocomplete="current-password"></div>
+          <button class="btn btn-small" type="submit" style="align-self:flex-start">Change email</button>
+        </form>
+      </div>
+      <div class="panel2">
+        <h2>Password</h2>
+        <form class="form" id="passForm" style="margin-top:0">
+          <div class="field"><label for="aCur">Current password</label><input type="password" id="aCur" autocomplete="current-password"></div>
+          <div class="field"><label for="aNew">New password</label><input type="password" id="aNew" autocomplete="new-password" minlength="8"><span class="hint">At least 8 characters. Other devices will be logged out.</span></div>
+          <button class="btn btn-small" type="submit" style="align-self:flex-start">Change password</button>
+        </form>
+      </div>
+      <div class="panel2">
+        <h2>Devices</h2>
+        <p class="sub">Logged in on a phone or computer you no longer use?</p>
+        <div class="cta-row">
+          <button class="btn btn-ghost btn-small" id="logoutOthers">Log out on other devices</button>
+          <button class="btn btn-ghost btn-small" id="logout">Log out</button>
+        </div>
+      </div>
+      <div class="panel2">
+        <h2>Your data</h2>
+        <p class="sub">Everything we store about you, as a file.</p>
+        <a class="btn btn-ghost btn-small" href="/api/me/export" download>Download my data</a>
+      </div>
+      <div class="panel2 danger-zone">
+        <h2>Delete account</h2>
+        <p class="sub">Deletes your account, your chats and everything your coach saved, straight away. This can't be undone.</p>
+        <button class="btn btn-danger btn-small" id="deleteAcct">Delete my account</button>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

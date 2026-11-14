@@ -15,7 +15,13 @@ Decisions made while building, on top of the owner's settled decisions in `open_
 | Cost control | Daily message limit per tester (default 60) + prompt caching of the system prompt | Plus the monthly spend limit on the Anthropic workspace. |
 | Data rights | Tester can download and delete their data from the menu | Basic GDPR hygiene for the alpha. |
 
+| Accounts (2026-11-14) | Email + password accounts, created only from an invite link; the AYW app's landing/login/profile pages used as the template, in the coach's own green design | Log in on any device. Passwords are hashed with scrypt; 8 failed logins per 15 min are blocked. |
+| Forgot password | No email yet: the admin's one-time login link also opens a 1-hour "set a new password" window | Avoids an email provider for the alpha; add SMTP later for self-service resets. |
+| Dashboard edits | People can remove items the coach saved (health notes, supplements, labs, meals, notes) and change goal and coaching style | Their data, their call. The eating-disorder flag is never shown or editable. |
+
 ## Still needs the owner
+
+- **Landing page wording** (`public/landing.html`): written by the developer from the brief. The owner should check the claims and tone, especially the example chat and "Built with care".
 
 - **Data retention**: how long to keep inactive testers (nothing is auto-deleted now).
 - **Monitoring**: the admin page can now show each tester's chat and the coach's memory (**View chat**), added for debugging on 2026-11-13. The owner should confirm who may use it, and testers should be told their chats can be read by the team. `ADMIN_READ_CHATS=off` hides it.

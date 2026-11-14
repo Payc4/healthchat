@@ -1,7 +1,7 @@
-// Health Coach chat page. Talks to server.js: /api/me, /api/gate, /api/chat (SSE), /api/me/delete.
+// Health Coach chat page. Talks to server.js: /api/me, /api/gate, /api/signup, /api/chat (SSE), /api/account/*.
 
 const $ = id => document.getElementById(id)
-const screens = ['loading', 'none', 'gate', 'declined']
+const screens = ['loading', 'none', 'gate', 'signup', 'claim', 'reset', 'declined']
 const MAX_PDF = 10 * 1024 * 1024
 const MAX_IMG_SIDE = 1568
 
@@ -29,6 +29,7 @@ function show(name) {
   $('chat').hidden = !chatting
   $('composer').hidden = !chatting
   $('menuBtn').hidden = !chatting
+  $('profileBtn').hidden = !chatting
 }
 
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]))
@@ -154,8 +155,14 @@ async function load() {
   } else if (me.state === 'gate') {
     $('gateText').textContent = me.gateText || ''
     show('gate')
+  } else if (me.state === 'claim') {
+    if (me.name) $('clName').value = me.name
+    show('claim')
+  } else if (me.state === 'reset') {
+    $('resetEmail').textContent = me.email ? ` as ${me.email}` : ''
+    show('reset')
   } else {
-    show('none')
+    location.replace('/login')
   }
 }
 
@@ -174,6 +181,7 @@ document.addEventListener('click', async e => {
   try {
     const r = await api('/api/gate', { answer: b.dataset.gate })
     if (r.state === 'declined') show('declined')
+    else if (r.state === 'signup') { show('signup'); $('suName').focus() }
     else await load()
   } catch (err) {
     alertBox(err.message)
@@ -385,16 +393,32 @@ document.addEventListener('click', e => {
 })
 document.addEventListener('keydown', e => { if (e.key === 'Escape') $('menu').hidden = true })
 
-$('deleteBtn').addEventListener('click', async () => {
-  $('menu').hidden = true
-  if (!confirm('Delete everything your coach knows about you, and all your messages? This can’t be undone.')) return
-  try {
-    await api('/api/me/delete', {})
-    $('chat').textContent = ''
-    show('none')
-    document.querySelector('#none h2').textContent = 'Your data was deleted'
-    document.querySelector('#none p').textContent = 'Everything we stored about you is gone. To start again you’ll need a new invite link.'
-  } catch (err) { alertBox(err.message) }
+$('logoutBtn').addEventListener('click', async () => {
+  await api('/api/logout', {}).catch(() => {})
+  location.href = '/'
 })
+
+// ───────── account forms ─────────
+
+function wireForm(formId, errId, path, fields) {
+  $(formId).addEventListener('submit', async e => {
+    e.preventDefault()
+    const btn = $(formId).querySelector('button[type=submit]')
+    $(errId).hidden = true
+    btn.disabled = true
+    try {
+      await api(path, fields())
+      await load()
+    } catch (err) {
+      $(errId).textContent = err.message
+      $(errId).hidden = false
+    }
+    btn.disabled = false
+  })
+}
+wireForm('signupForm', 'signupErr', '/api/signup', () => ({ adult: true, name: $('suName').value, email: $('suEmail').value, password: $('suPass').value }))
+wireForm('claimForm', 'claimErr', '/api/account/claim', () => ({ name: $('clName').value, email: $('clEmail').value, password: $('clPass').value }))
+wireForm('resetForm', 'resetErr', '/api/account/password', () => ({ new_password: $('rsPass').value }))
+$('resetSkip').addEventListener('click', async () => { await api('/api/account/skip-reset', {}).catch(() => {}); load() })
 
 load()

@@ -16,13 +16,16 @@
     <header class="top">
       <span class="mark" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg></span>
       <h1><span id="appName">Health Coach</span><small id="subtitle">Your AI coach · test version</small></h1>
+      <a class="icon-btn" id="profileBtn" href="/profile" aria-label="Your profile" title="Your profile" hidden>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>
+      </a>
       <button class="icon-btn" id="menuBtn" aria-label="Menu" aria-haspopup="true" aria-expanded="false" hidden>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>
       </button>
       <div class="menu" id="menu" role="menu" hidden>
+        <a href="/profile" role="menuitem">Profile &amp; settings</a>
         <button role="menuitem" id="helpBtn">How it works</button>
-        <a href="/api/me/export" role="menuitem" download>Download my data</a>
-        <button role="menuitem" class="danger" id="deleteBtn">Delete my data</button>
+        <button role="menuitem" id="logoutBtn">Log out</button>
       </div>
     </header>
 
@@ -31,7 +34,49 @@
     <main class="screen" id="none" hidden>
       <div class="card">
         <h2>Invite only</h2>
-        <p>This coach is in a private test. Open the personal invite link you received to get started.</p>
+        <p>This coach is in a private test. Open the personal invite link you received to get started, or log in if you already have an account.</p>
+        <div class="stack"><a class="btn" href="/login">Log in</a></div>
+      </div>
+    </main>
+
+    <main class="screen" id="signup" hidden>
+      <div class="card">
+        <h2>Create your account</h2>
+        <p>So you can log in on any device and pick up where you left off.</p>
+        <form class="form" id="signupForm" novalidate>
+          <div class="form-error" id="signupErr" role="alert" hidden></div>
+          <div class="field"><label for="suName">First name</label><input id="suName" autocomplete="given-name" maxlength="60" required></div>
+          <div class="field"><label for="suEmail">Email address</label><input type="email" id="suEmail" autocomplete="email" inputmode="email" autocapitalize="none" required></div>
+          <div class="field"><label for="suPass">Password</label><input type="password" id="suPass" autocomplete="new-password" minlength="8" required><span class="hint">At least 8 characters.</span></div>
+          <button class="btn" type="submit">Create account and start</button>
+        </form>
+      </div>
+    </main>
+
+    <main class="screen" id="claim" hidden>
+      <div class="card">
+        <h2>Set up your login</h2>
+        <p>You can now log in with an email and password, on any device. Set it up once, and your chats and profile stay as they are.</p>
+        <form class="form" id="claimForm" novalidate>
+          <div class="form-error" id="claimErr" role="alert" hidden></div>
+          <div class="field"><label for="clName">First name</label><input id="clName" autocomplete="given-name" maxlength="60" required></div>
+          <div class="field"><label for="clEmail">Email address</label><input type="email" id="clEmail" autocomplete="email" inputmode="email" autocapitalize="none" required></div>
+          <div class="field"><label for="clPass">Password</label><input type="password" id="clPass" autocomplete="new-password" minlength="8" required><span class="hint">At least 8 characters.</span></div>
+          <button class="btn" type="submit">Save and continue</button>
+        </form>
+      </div>
+    </main>
+
+    <main class="screen" id="reset" hidden>
+      <div class="card">
+        <h2>Choose a new password?</h2>
+        <p>You're logged in with a login link<span id="resetEmail"></span>. If you've forgotten your password, set a new one now.</p>
+        <form class="form" id="resetForm" novalidate>
+          <div class="form-error" id="resetErr" role="alert" hidden></div>
+          <div class="field"><label for="rsPass">New password</label><input type="password" id="rsPass" autocomplete="new-password" minlength="8" required><span class="hint">At least 8 characters. You'll stay logged in here; other devices are logged out.</span></div>
+          <button class="btn" type="submit">Save new password</button>
+          <button class="btn btn-ghost" type="button" id="resetSkip">Keep my current password</button>
+        </form>
       </div>
     </main>
 

@@ -46,7 +46,7 @@ async function refresh() {
 
   $('users').innerHTML = s.users.length ? s.users.map(u => `
     <tr>
-      <td><strong>${esc(u.name || u.label || 'Tester')}</strong>${u.name && u.label ? `<br><span class="status">${esc(u.label)}</span>` : ''}</td>
+      <td><strong>${esc(u.name || u.label || 'Tester')}</strong>${u.email ? `<br><span class="status">${esc(u.email)}</span>` : '<br><span class="pill off">no login yet</span>'}${u.label ? `<br><span class="status">Invite: ${esc(u.label)}</span>` : ''}</td>
       <td>${when(u.created_at)}</td>
       <td>${when(u.last_active)}</td>
       <td>${u.messages}</td>
@@ -54,7 +54,7 @@ async function refresh() {
       <td>${u.onboarded ? '<span class="pill">Yes</span>' : '<span class="pill off">Not yet</span>'}</td>
       <td><div class="acts">
         ${s.canReadChats ? `<button class="btn btn-small" data-chat="${esc(u.id)}">View chat</button>` : ''}
-        <button class="btn btn-ghost btn-small" data-relink="${esc(u.id)}" title="New one-time link that logs this tester back in (new phone, cleared browser)">Login link</button>
+        <button class="btn btn-ghost btn-small" data-relink="${esc(u.id)}" title="One-time link that logs this tester in and lets them choose a new password (forgotten password, new phone)">Login link</button>
         <button class="btn btn-danger btn-small" data-deluser="${esc(u.id)}" data-name="${esc(u.name || u.label || 'this tester')}">Delete</button>
       </div></td>
     </tr>`).join('') : '<tr><td colspan="7" class="status">No testers yet. Create an invite link above.</td></tr>'
@@ -116,7 +116,7 @@ document.addEventListener('click', async e => {
     if (b.dataset.chat) return openChat(b.dataset.chat)
     if (b.dataset.relink) {
       const r = await api('relink', { user_id: b.dataset.relink })
-      showLink(r.url, 'Login link for this tester (works once):')
+      showLink(r.url, 'Login link for this tester (works once; they can set a new password after opening it):')
       window.scrollTo({ top: 0, behavior: 'smooth' })
       return refresh()
     }

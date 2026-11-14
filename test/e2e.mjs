@@ -26,6 +26,7 @@ for (let i = 0; i < 50; i++) { try { if ((await fetch(BASE + '/health')).ok) bre
 
 const users = async () => (await readdir(join(dataDir, 'users')).catch(() => [])).filter(f => f.endsWith('.json'))
 const userFile = async () => { const f = await users(); return JSON.parse(await readFile(join(dataDir, 'users', f.at(-1)), 'utf8')) }
+const userBy = async email => { for (const f of await users()) { const u = JSON.parse(await readFile(join(dataDir, 'users', f), 'utf8')); if (u.account?.email === email) return u } return null }
 const requests = async () => (await fetch(MOCK + '/requests')).json()
 const settle = () => new Promise(r => setTimeout(r, 400))
 const errors = []
@@ -53,11 +54,25 @@ try {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 })
   const page = await ctx.newPage()
   page.on('pageerror', e => errors.push(e.message))
-  page.on('console', m => { if (m.type() === 'error') errors.push('console: ' + m.text()) })
+  page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push('console: ' + m.text()) }) // HTTP errors the test triggers on purpose are fine
   page.on('dialog', d => d.accept())
   await page.goto(BASE + '/')
-  await page.waitForSelector('#none:not([hidden])')
-  step('invite-only screen without a link')
+  assert.match(await page.textContent('h1'), /gets to know you/)
+  await page.screenshot({ path: join(SHOTS, '0-landing.png'), fullPage: true })
+  await page.goto(BASE + '/app')
+  await page.waitForSelector('#loginForm')
+  assert.equal(new URL(page.url()).pathname, '/login')
+  await page.goto(BASE + '/profile'); assert.equal(new URL(page.url()).pathname, '/login')
+  step('landing page; /app and /profile send logged-out visitors to /login')
+
+  // Sign-up after the 18+ buttons.
+  async function signUp(p, name, email, password = 'correct horse') {
+    await p.click('[data-gate=adult]')
+    await p.waitForSelector('#signup:not([hidden])')
+    await p.fill('#suName', name); await p.fill('#suEmail', email); await p.fill('#suPass', password)
+    await p.click('#signupForm button[type=submit]')
+    await p.waitForSelector('#chat:not([hidden]) .msg.coach')
+  }
 
   // ── gate ──
   await page.goto(link1)
@@ -65,13 +80,25 @@ try {
   assert.match(await page.textContent('#gateText'), /adults only/)
   await page.screenshot({ path: join(SHOTS, '1-gate.png') })
   await page.click('[data-gate=adult]')
+  await page.waitForSelector('#signup:not([hidden])')
+  assert.equal((await users()).length, 0, 'nothing stored before the account form')
+  await page.fill('#suName', 'Tomas'); await page.fill('#suEmail', 'not-an-email'); await page.fill('#suPass', 'short')
+  await page.click('#signupForm button[type=submit]')
+  await page.waitForSelector('#signupErr:not([hidden])')
+  await page.fill('#suEmail', 'Tomas@Example.com'); await page.fill('#suPass', 'correct horse')
+  await page.screenshot({ path: join(SHOTS, '1a-signup.png') })
+  await page.click('#signupForm button[type=submit]')
   await page.waitForSelector('#chat:not([hidden]) .msg.coach')
-  assert.match(await page.textContent('#chat'), /What are you hoping to get out of working with me/)
+  assert.match(await page.textContent('#chat'), /Thanks, Tomas! What are you hoping to get out of working with me/)
   assert.equal((await users()).length, 1)
+  let acct = (await userFile()).account
+  assert.equal(acct.email, 'tomas@example.com')
+  assert.match(acct.password_hash, /^scrypt\$/)
+  assert.ok(!JSON.stringify(await userFile()).includes('correct horse'), 'password not stored in plain text')
   // invite can't be reused
   const reuse = await fetch(link1, { redirect: 'manual' })
   assert.equal(reuse.status, 410)
-  step('age gate → profile created, first question shown, invite single-use')
+  step('age gate → account form → account created (hashed password), first question, invite single-use')
 
   // ── first-time tip ──
   await page.waitForSelector('#tip:not([hidden])')
@@ -196,6 +223,8 @@ try {
   const relink = await admin.textContent('#newlink span')
   const phone2 = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage()
   await phone2.goto(relink)
+  await phone2.waitForSelector('#reset:not([hidden])')
+  await phone2.click('#resetSkip')
   await phone2.waitForSelector('#chat:not([hidden]) .msg.coach')
   assert.match(await phone2.textContent('#chat'), /my name is Tomas/)
   step('admin list + login link logs the same tester in on a new device')
@@ -213,21 +242,113 @@ try {
   await admin.setViewportSize({ width: 1280, height: 800 })
   step('admin: View chat shows messages + profile; testers can\'t call it')
 
-  // ── delete my data ──
-  await page.click('#menuBtn'); await page.click('#deleteBtn')
-  await page.waitForSelector('#none:not([hidden])')
-  assert.equal((await users()).length, 0)
-  step('delete my data removes the file')
+  // ── log out + log in ──
+  await page.click('#menuBtn'); await page.click('#logoutBtn')
+  await page.waitForURL(BASE + '/')
+  await page.goto(BASE + '/login')
+  await page.fill('#email', 'tomas@example.com'); await page.fill('#password', 'wrong password')
+  await page.click('#go'); await page.waitForSelector('#err:not([hidden])')
+  assert.match(await page.textContent('#err'), /don’t match/)
+  await page.fill('#email', ' TOMAS@example.com '); await page.fill('#password', 'correct horse')
+  await page.screenshot({ path: join(SHOTS, '8-login.png') })
+  await page.click('#go'); await page.waitForURL(BASE + '/app')
+  await page.waitForSelector('#chat:not([hidden]) .msg.coach')
+  await page.goto(BASE + '/'); assert.equal(new URL(page.url()).pathname, '/app', 'logged-in visitors skip the landing page')
+  step('log out; wrong password refused; log in with email (any case/spaces) + password')
+
+  // ── dashboard ──
+  await page.goto(BASE + '/profile')
+  await page.waitForFunction(() => document.querySelector('#sMsgs').textContent !== '–')
+  assert.ok(Number(await page.textContent('#sMsgs')) >= 10)
+  assert.equal(await page.textContent('#sDays'), '1')
+  assert.equal(await page.textContent('#sStreak'), '1')
+  assert.match(await page.textContent('#pGoal'), /Lose some weight/)
+  assert.match(await page.textContent('#pNumbers'), /Ferritin/)
+  await page.screenshot({ path: join(SHOTS, '9-progress.png'), fullPage: true })
+  await page.click('#tab-knows')
+  assert.match(await page.textContent('#knowsBody'), /Ferritin/)
+  await page.screenshot({ path: join(SHOTS, '10-knows.png'), fullPage: true })
+  await page.click('#knowsBody [data-remove="lab_markers"]')
+  await page.waitForSelector('.toast')
+  u = await userFile(); assert.equal(u.profile.lab_markers.length, 0, 'lab marker removed')
+  await page.selectOption('select[data-field="profile.preferences.coaching_style"]', 'gentle')
+  await page.waitForFunction(async () => true); await settle()
+  u = await userFile(); assert.equal(u.profile.profile.preferences.coaching_style, 'gentle')
+  await page.fill('#goalIn', 'Lose 5 kg by summer'); await page.click('form[data-set="goals.primary"] button')
+  await settle(); u = await userFile(); assert.equal(u.profile.goals.primary, 'Lose 5 kg by summer')
+  // stale removal is refused
+  const stale = await page.evaluate(async () => (await fetch('/api/profile/remove', { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'fetch' }, body: JSON.stringify({ list: 'supplements', index: 0, item: { name: 'nope' } }) })).status)
+  assert.equal(stale, 409)
+  const notAllowed = await page.evaluate(async () => (await fetch('/api/profile/set', { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'fetch' }, body: JSON.stringify({ field: 'constraints.eating_disorder_flag', value: false }) })).status)
+  assert.equal(notAllowed, 400)
+  step('dashboard: stats, goal, numbers; remove a lab result; change style + goal; stale/forbidden edits refused')
+
+  // ── account settings ──
+  await page.click('#tab-account')
+  await page.fill('#aName', 'Tomas K'); await page.click('#nameForm button'); await settle()
+  u = await userFile(); assert.equal(u.account.name, 'Tomas K'); assert.equal(u.profile.profile.display_name, 'Tomas K')
+  await page.fill('#aCur', 'wrong'); await page.fill('#aNew', 'new password 1'); await page.click('#passForm button')
+  await page.waitForSelector('#err:not([hidden])')
+  await page.fill('#aCur', 'correct horse'); await page.fill('#aNew', 'new password 1'); await page.click('#passForm button')
+  await page.waitForFunction(() => document.querySelector('#err').hidden); await settle()
+  await page.screenshot({ path: join(SHOTS, '11-account.png'), fullPage: true })
+  // the other device (phone2) is logged out by the password change
+  await phone2.goto(BASE + '/app'); await phone2.waitForSelector('#loginForm')
+  // this device stays logged in
+  await page.goto(BASE + '/app'); await page.waitForSelector('#chat:not([hidden])')
+  step('change name; wrong current password refused; new password logs out other devices, keeps this one')
+
+  // ── forgotten password: login link → choose a new one ──
+  await admin.reload(); await admin.waitForSelector('#users [data-relink]')
+  await admin.click('#users [data-relink]')
+  await admin.waitForFunction(() => document.querySelector('#newlink').textContent.includes('Login link'))
+  const resetLink = await admin.textContent('#newlink span')
+  await phone2.goto(resetLink)
+  await phone2.waitForSelector('#reset:not([hidden])')
+  await phone2.fill('#rsPass', 'brand new pass'); await phone2.click('#resetForm button[type=submit]')
+  await phone2.waitForSelector('#chat:not([hidden]) .msg.coach')
+  const login2 = await fetch(BASE + '/api/login', { method: 'POST', headers: { 'content-type': 'application/json', 'x-requested-with': 'fetch' }, body: JSON.stringify({ email: 'tomas@example.com', password: 'brand new pass' }) })
+  assert.equal(login2.status, 200)
+  step('forgot password: admin login link → set a new password without the old one')
+
+  // ── legacy tester (from before accounts) sets up a login ──
+  const { createHmac } = await import('node:crypto')
+  const legacyId = 'legacyTester0001'
+  const now = new Date().toISOString()
+  const { writeFile } = await import('node:fs/promises')
+  await writeFile(join(dataDir, 'users', legacyId + '.json'), JSON.stringify({ id: legacyId, label: 'Old tester', created_at: now, profile: { ...(await userFile()).profile, profile: { display_name: 'Rasa', preferences: {} } }, turns: [], log: [{ role: 'assistant', content: 'Old chat', ts: now }], summary: '', stats: { messages: 3 } }))
+  const legacy = await browser.newContext({ viewport: { width: 390, height: 844 } })
+  await legacy.addCookies([{ name: 'hc_session', value: legacyId + '.' + createHmac('sha256', 'x'.repeat(40)).update(legacyId).digest('base64url'), url: BASE }])
+  const lp = await legacy.newPage()
+  await lp.goto(BASE + '/app'); await lp.waitForSelector('#claim:not([hidden])')
+  assert.equal(await lp.inputValue('#clName'), 'Rasa')
+  await lp.fill('#clEmail', 'tomas@example.com'); await lp.fill('#clPass', 'rasa password')
+  await lp.click('#claimForm button[type=submit]'); await lp.waitForSelector('#claimErr:not([hidden])')
+  assert.match(await lp.textContent('#claimErr'), /already used/)
+  await lp.fill('#clEmail', 'rasa@example.com'); await lp.click('#claimForm button[type=submit]')
+  await lp.waitForSelector('#chat:not([hidden]) .msg.coach')
+  assert.match(await lp.textContent('#chat'), /Old chat/)
+  step('tester from before accounts: asked once for email + password, chat kept; duplicate email refused')
+
+  // ── delete account from the dashboard ──
+  const countBefore = (await users()).length
+  // the first device was logged out when the password was reset on phone2
+  await page.goto(BASE + '/profile'); assert.equal(new URL(page.url()).pathname, '/login')
+  phone2.on('dialog', d => d.accept())
+  await phone2.goto(BASE + '/profile#account'); await phone2.waitForSelector('#account:not([hidden])')
+  await phone2.click('#deleteAcct'); await phone2.waitForURL(BASE + '/')
+  assert.equal((await users()).length, countBefore - 1)
+  step('delete account from the dashboard removes the file')
 
   // ── ED flag ──
   const ed = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage()
   ed.on('pageerror', e => errors.push('ed: ' + e.message)); ed.on('dialog', d => d.accept())
-  await ed.goto(await invite('Fake tester B')); await ed.click('[data-gate=adult]'); await ed.waitForSelector('.msg.coach')
+  await ed.goto(await invite('Fake tester B')); await signUp(ed, 'Bea', 'bea@example.com')
   const sayOn = async (p, text) => { await p.fill('#msg', text); await p.click('#sendBtn'); await p.waitForFunction(() => !document.querySelector('.typing') && document.querySelector('#msg').value === ''); await settle() }
   await sayOn(ed, 'I want to lose weight and set a target')
-  u = await userFile(); assert.equal(u.profile.nutrition.targets.calories, 1900)
+  u = await userBy('bea@example.com'); assert.equal(u.profile.nutrition.targets.calories, 1900)
   await sayOn(ed, 'honestly I binge and then purge sometimes')
-  u = await userFile()
+  u = await userBy('bea@example.com')
   assert.equal(u.profile.constraints.eating_disorder_flag, true)
   assert.equal(u.profile.nutrition.targets.calories, null)
   assert.ok(!JSON.stringify(u.profile).includes('purge'), 'no ED details in the profile')
@@ -243,21 +364,24 @@ try {
   await kid.goto(await invite('Fake tester C')); await kid.click('[data-gate=minor]')
   await kid.waitForSelector('#declined:not([hidden])')
   assert.equal((await users()).length, before)
-  await kid.reload(); await kid.waitForSelector('#none:not([hidden])')
+  await kid.reload(); await kid.waitForSelector('#loginForm')
   step('under 18 at gate → nothing stored, invite retired')
 
   // ── under 18 later in chat ──
   const kid2 = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage()
-  await kid2.goto(await invite('Fake tester D')); await kid2.click('[data-gate=adult]'); await kid2.waitForSelector('.msg.coach')
+  await kid2.goto(await invite('Fake tester D')); await signUp(kid2, 'Dan', 'dan@example.com')
   assert.equal((await users()).length, before + 1)
   await sayOn(kid2, 'actually I am 16')
   await settle()
   assert.equal((await users()).length, before, 'under-18 user deleted')
-  await kid2.reload(); await kid2.waitForSelector('#none:not([hidden])')
+  await kid2.reload(); await kid2.waitForSelector('#loginForm')
   step('says under 18 in chat → everything deleted')
 
   // ── layout: no horizontal scroll at 390px ──
-  for (const p of [ed, admin]) {
+  const land = await (await browser.newContext({ viewport: { width: 390, height: 844 } })).newPage()
+  await land.goto(BASE + '/')
+  await page.goto(BASE + '/login')
+  for (const p of [ed, admin, land]) {
     const over = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)
     assert.equal(over, false, 'horizontal scroll')
   }

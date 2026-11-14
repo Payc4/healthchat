@@ -2,7 +2,9 @@
 
 Invite-only AI health coach website. Claude Sonnet 5.5 (`claude-sonnet-5-5`), Node 22 with no npm dependencies, data stored as JSON files in one volume.
 
-Testers open a one-time invite link, confirm they are 18+ (buttons), then chat. Text, photos (meals, wearable screenshots, supplement labels) and PDFs (blood tests) are supported. The coach remembers each person through a structured profile, their last 12 messages and a rolling summary of older ones.
+Testers open a one-time invite link, confirm they are 18+ (buttons), create an account (name, email, password), then chat. After that they log in with email and password on any device.
+
+Pages: `/` landing page · `/login` · `/app` the chat · `/profile` dashboard (progress, what the coach knows, account settings) · `/admin`. Text, photos (meals, wearable screenshots, supplement labels) and PDFs (blood tests) are supported. The coach remembers each person through a structured profile, their last 12 messages and a rolling summary of older ones.
 
 ## Deploy on Coolify
 
@@ -27,6 +29,10 @@ Testers open a one-time invite link, confirm they are 18+ (buttons), then chat. 
 Health check: `GET /health`.
 
 ## Using it
+
+- **Forgot password:** there's no email sending yet. On `/admin`, click **Login link** next to the tester and send it to them. It logs them in and offers to set a new password, without needing the old one, for 1 hour.
+- **Testers from before accounts existed** are asked once, on their next visit, to add a name, email and password. Their chats and profile stay.
+- Changing the password (or "Log out on other devices") logs out every other device.
 
 - **/admin**: create one-time invite links; see testers, messages and token use; **View chat** (a tester's full chat plus the profile and summary the coach works from, for debugging); create a **login link** for an existing tester (new phone or cleared browser); delete a tester.
 - **Tester menu (⋮)**: *Download my data* (JSON) and *Delete my data* (everything, immediately).
