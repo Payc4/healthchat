@@ -245,3 +245,26 @@ a { color: var(--accent); }
 .kv dd { min-width: 0; }
 .kv select { max-width: 100%; }
 @media (max-width: 420px) { .tabs button { padding: 0 10px; font-size: 14px; } .kv { grid-template-columns: 1fr; gap: 2px 0; } .kv dd { margin-bottom: 8px; } }
+
+/* landing: content from the AI Wellness Coach overview */
+html { scroll-behavior: smooth; }
+.site-nav .nav-text { color: var(--ink-2); text-decoration: none; font-size: 15px; font-weight: 600; margin-right: 6px; }
+.site-nav .nav-text:hover { color: var(--accent); }
+@media (max-width: 480px) { .site-nav .nav-text { display: none; } }
+.kicker { margin: 0 0 8px; font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+.kicker.light { color: rgba(255, 255, 255, .8); }
+.section .sub.wide { max-width: 48em; font-size: 17px; }
+.steps { list-style: none; margin: 24px 0 0; padding: 0; display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 640px) { .steps { grid-template-columns: repeat(5, 1fr); } }
+.steps li { padding: 18px; border-radius: 18px; background: var(--bg); box-shadow: 0 0 0 1px var(--line); }
+.steps .num { display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.steps h3 { margin: 10px 0 4px; font-size: 17px; }
+.steps p { margin: 0; color: var(--ink-2); font-size: 15px; }
+.tag { display: inline-block; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .06em; }
+.flex-banner { margin-top: 14px; padding: 22px; border-radius: 18px; background: var(--accent); color: var(--accent-ink); }
+.flex-banner p:last-child { margin: 0; font-size: 17px; }
+.why { margin: 14px 0 0; padding: 18px 20px; border-left: 4px solid var(--accent); border-radius: 0 16px 16px 0; background: var(--bg); }
+.why p:last-child { margin: 0; font-size: 17px; color: var(--ink-2); }
+.why strong { color: var(--ink); }
+.partner-cta { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 22px; }
+.partner-cta p { margin: 0; color: var(--ink-2); }

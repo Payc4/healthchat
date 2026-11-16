@@ -19,6 +19,8 @@ const PORT = Number(process.env.PORT || 3000)
 const APP_NAME = process.env.APP_NAME || 'Health Coach'
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || ''
 const DAILY_LIMIT = Number(process.env.DAILY_MESSAGE_LIMIT || 60)
+// Landing page "For partners" button opens an email to this address; no button while it's unset.
+const PARTNER_EMAIL = (process.env.PARTNER_EMAIL || '').trim()
 const SECRET = process.env.SESSION_SECRET || randomBytes(32).toString('hex')
 const PUBLIC = new URL('./public/', import.meta.url).pathname
 const MAX_CHAT_BYTES = 16 * 1024 * 1024
@@ -135,7 +137,12 @@ async function handle(req, res) {
   // Pages. Logged-in people skip the landing and login pages.
   if (path === '/' || path === '/login') {
     if (await sessionUser(req)) return redirect(res, '/app')
-    return sendFile(res, path === '/' ? 'landing.html' : 'login.html')
+    if (path === '/login') return sendFile(res, 'login.html')
+    const html = (await readFile(join(PUBLIC, 'landing.html'), 'utf8')).replace('<!--PARTNER_CTA-->', PARTNER_EMAIL
+      ? `<a class="btn" href="mailto:${encodeURIComponent(PARTNER_EMAIL).replace('%40', '@')}?subject=${encodeURIComponent('Tailored AI coach for our customers')}">Book a demo</a>`
+      : '')
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' })
+    return res.end(html)
   }
   if (path === '/app' || path === '/index.html') return sendFile(res, 'index.html')
   if (path === '/profile') {

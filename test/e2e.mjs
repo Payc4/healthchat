@@ -17,7 +17,7 @@ const mock = await startMock(0)
 const MOCK = `http://127.0.0.1:${mock.address().port}`
 
 const server = spawn(process.execPath, ['server.js'], {
-  env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, ANTHROPIC_API_KEY: 'test-not-real', ANTHROPIC_API_BASE: MOCK, ADMIN_PASSWORD: 'pw-test', SESSION_SECRET: 'x'.repeat(40), DAILY_MESSAGE_LIMIT: '40' },
+  env: { ...process.env, PORT: String(PORT), DATA_DIR: dataDir, ANTHROPIC_API_KEY: 'test-not-real', ANTHROPIC_API_BASE: MOCK, ADMIN_PASSWORD: 'pw-test', SESSION_SECRET: 'x'.repeat(40), DAILY_MESSAGE_LIMIT: '40', PARTNER_EMAIL: 'partners@example.com' },
   stdio: ['ignore', 'pipe', 'pipe'],
 })
 let serverLog = ''
@@ -57,7 +57,9 @@ try {
   page.on('console', m => { if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push('console: ' + m.text()) }) // HTTP errors the test triggers on purpose are fine
   page.on('dialog', d => d.accept())
   await page.goto(BASE + '/')
-  assert.match(await page.textContent('h1'), /gets to know you/)
+  assert.match(await page.textContent('h1'), /actually follow through/)
+  assert.equal(await page.locator('#partners a[href^="mailto:partners@example.com"]').count(), 1, 'Book a demo button')
+  assert.equal(await page.locator('.steps li').count(), 5)
   await page.screenshot({ path: join(SHOTS, '0-landing.png'), fullPage: true })
   await page.goto(BASE + '/app')
   await page.waitForSelector('#loginForm')

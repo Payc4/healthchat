@@ -20,6 +20,7 @@ Pages: `/` landing page · `/login` · `/app` the chat · `/profile` dashboard (
 | `SESSION_SECRET` | yes | Long random string (`openssl rand -hex 32`). Keeps testers logged in across redeploys. |
 | `CLAUDE_MODEL` | no | Default `claude-sonnet-5-5`. |
 | `DAILY_MESSAGE_LIMIT` | no | Messages per tester per day, default `60`. |
+| `PARTNER_EMAIL` | no | Email address for the landing page's **Book a demo** button in the "For partners" section. Without it the button is hidden. |
 | `ADMIN_READ_CHATS` | no | Admin can read each tester's chat and what the coach remembers (for debugging). On by default; set to `off` to hide chats. |
 | `COACH_EFFORT` | no | How hard the coach thinks before replying: `low`, `medium` (default), `high`. Higher is slower and costs more. |
 | `APP_NAME` | no | Shown in the header, default `Health Coach`. |

@@ -21,7 +21,7 @@ Decisions made while building, on top of the owner's settled decisions in `open_
 
 ## Still needs the owner
 
-- **Landing page wording** (`public/landing.html`): written by the developer from the brief. The owner should check the claims and tone, especially the example chat and "Built with care".
+- **Landing page wording** (`public/landing.html`, 2026-11-16): now based on the owner's *AI Wellness Coach overview* PDF, for both users and partners. Per the owner, it uses the PDF's claims as written, including ones not built yet in this app: daily reminders and streaks, before-and-after views, and branded (white-label) versions. Proactive messages were out of scope for v1 (`open_questions.md`), so check these before the page goes to partners. Set `PARTNER_EMAIL` for the "Book a demo" button.
 
 - **Data retention**: how long to keep inactive testers (nothing is auto-deleted now).
 - **Monitoring**: the admin page can now show each tester's chat and the coach's memory (**View chat**), added for debugging on 2026-11-13. The owner should confirm who may use it, and testers should be told their chats can be read by the team. `ADMIN_READ_CHATS=off` hides it.
